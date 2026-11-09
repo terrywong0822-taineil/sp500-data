@@ -182,7 +182,8 @@ def main() -> None:
     frozen["spy_source_date"] = frozen.spy_source_date.dt.strftime("%Y-%m-%d")
     frozen_cmp = frozen.merge(old_weekly, on=key, suffixes=("_frozen", "_old_membership"), validate="one_to_one")
     frozen_diff = frozen_cmp[
-        frozen_cmp.eligible_members.astype(int) != frozen_cmp.eligible_members_frozen.astype(int)
+        frozen_cmp.eligible_members_old_membership.astype(int)
+        != frozen_cmp.eligible_members_frozen.astype(int)
     ]
     print(f"PAIRED_WEEKS {len(paired)}")
     print(f"MEMBERSHIP_EFFECT eligible_weeks={(paired.eligible_delta_repaired_minus_old != 0).sum()}")
