@@ -41,7 +41,7 @@ def main() -> None:
             "ticker"].astype(str))
         day = prices[prices.date.dt.normalize() == dt].copy()
         day = day[~day.ticker.map(lambda t: (t, dt) in no_trade_pairs)]
-        eligible = set(day.loc[day.ma200.notna() & day.adj_close.notna(), "ticker"])
+        eligible = set(day.loc[day.ma200.notna() & day.adj_close.notna(), "ticker"]) & active
         old_n = int(row.eligible_members)
         if len(eligible) != old_n:
             mismatches.append((row, dt, active, day, eligible))
@@ -52,10 +52,10 @@ def main() -> None:
         no_ma_active = sorted(set(active_day.loc[active_day.ma200.isna(), "ticker"]))
         missing_price = sorted(active - set(day.ticker))
         print(f"DATE {dt.date()} baseline_eligible={int(row.eligible_members)} "
-              f"rebuilt_eligible={len(eligible & active)} active={len(active)}")
+              f"rebuilt_eligible={len(eligible)} active={len(active)}")
         print(f"ACTIVE_MISSING_PRICE {missing_price}")
         print(f"ACTIVE_NO_MA {no_ma_active}")
-        print(f"ACTIVE_ELIGIBLE {sorted(eligible & active)}")
+        print(f"ACTIVE_ELIGIBLE {sorted(eligible)}")
         for ticker in no_ma_active:
             hist = prices[(prices.ticker == ticker) & (prices.date <= dt) &
                           prices.adj_close.notna()]
