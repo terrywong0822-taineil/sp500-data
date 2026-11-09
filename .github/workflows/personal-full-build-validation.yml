@@ -119,7 +119,7 @@ jobs:
 
       - name: Diagnose denominator differences at member level
         if: always()
-        run: python tools/diagnose_spy_breadth.py
+        run: python tools/diagnose_spy_breadth.py "$RUNNER_TEMP/published_membership_intervals.parquet"
 
       - name: Save isolated build outputs
         if: always()
@@ -135,5 +135,9 @@ jobs:
             data/universe/wiki_changes.csv
             data/universe/tickers.txt
             data/validation/spy-breadth-rebuilt.csv
+            data/validation/spy-breadth-counterfactual-original-membership.csv
+            data/validation/spy-breadth-counterfactual-repaired-membership.csv
+            data/validation/spy-breadth-paired-membership-diff.csv
+            data/validation/spy-breadth-paired-member-diff.csv
           if-no-files-found: warn
           retention-days: 30
