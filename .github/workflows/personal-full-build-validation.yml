@@ -1,0 +1,122 @@
+name: Personal SPY full-build validation
+
+on:
+  push:
+    branches:
+      - personal/spy-full-build-validation
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  full-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out the pinned repair candidate
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build dependencies
+        run: python -m pip install --upgrade pip pandas pyarrow beautifulsoup4 lxml
+
+      - name: Build current and historical membership in the isolated runner
+        run: |
+          python build_universe.py
+          python bridge_membership.py
+
+      - name: Download the published baseline for a controlled interval diff
+        run: |
+          curl -fSsL --retry 3 -o "$RUNNER_TEMP/published_membership_intervals.parquet" \
+            https://github.com/Johnbrick123/sp500-data/releases/download/data/membership_intervals.parquet
+
+      - name: Validate snapshot, PIT intervals, and approved boundary-only diff
+        run: |
+          python - "$RUNNER_TEMP/published_membership_intervals.parquet" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          import pandas as pd
+
+          u = Path("data/universe")
+          meta = json.loads((u / "current_constituents.meta.json").read_text())
+          current = pd.read_csv(u / "current_constituents.csv")
+          assert "Symbol" in current.columns, "Current snapshot has no Symbol column"
+          cur = {str(x).strip().replace(".", "-") for x in current["Symbol"]
+                 if str(x).strip() and str(x).lower() != "nan"}
+          assert len(cur) == int(meta["symbol_count"]), (
+              f"CSV/metadata count mismatch: {len(cur)} vs {meta['symbol_count']}"
+          )
+
+          new = pd.read_parquet(u / "membership_intervals.parquet")
+          pub = pd.read_parquet(sys.argv[1])
+          for frame in (new, pub):
+              frame["start"] = pd.to_datetime(frame["start"])
+              frame["end"] = pd.to_datetime(frame["end"])
+
+          open_members = set(new.loc[new["end"].isna(), "ticker"].astype(str))
+          assert open_members == cur, (
+              f"Open intervals differ from current snapshot; "
+              f"missing={sorted(cur-open_members)}, extra={sorted(open_members-cur)}"
+          )
+
+          def d(v):
+              return None if pd.isna(v) else pd.Timestamp(v).date().isoformat()
+
+          def interval_set(frame):
+              return {(str(r.ticker), d(r.start), d(r.end))
+                      for r in frame[["ticker", "start", "end"]].itertuples(index=False)}
+
+          removed = interval_set(pub) - interval_set(new)
+          added = interval_set(new) - interval_set(pub)
+          expected_removed = {
+              ("IR", "2020-03-02", None),
+              ("XEC", "2014-06-23", "2020-03-02"),
+          }
+          expected_added = {
+              ("IR", "2020-03-03", None),
+              ("XEC", "2014-06-23", "2020-03-03"),
+          }
+          assert removed == expected_removed, f"Unexpected intervals removed: {sorted(removed, key=str)}"
+          assert added == expected_added, f"Unexpected intervals added: {sorted(added, key=str)}"
+
+          for ticker, expected_start in (("TT", "2010-11-17"), ("IR", "2020-03-03")):
+              rows = new[(new.ticker == ticker) & new.end.isna()]
+              assert len(rows) == 1 and d(rows.iloc[0].start) == expected_start, (
+                  f"{ticker} current interval mismatch: {rows.to_dict('records')}"
+              )
+          xec = new[(new.ticker == "XEC") &
+                    (new.start.map(d) == "2014-06-23") &
+                    (new.end.map(d) == "2020-03-03")]
+          assert len(xec) == 1, "XEC interval is not [2014-06-23, 2020-03-03)"
+
+          members = pd.read_parquet(u / "members.parquet")
+          assert not members.empty and {"date", "ticker"}.issubset(members.columns)
+          print("PASS: complete build_universe.py + bridge_membership.py")
+          print(f"PASS: live snapshot {len(cur)} symbols; metadata count matches")
+          print(f"PASS: {len(open_members)} open-ended intervals exactly match current members")
+          print(f"PASS: TT [2010-11-17, open), IR [2020-03-03, open), "
+                "XEC [2014-06-23, 2020-03-03)")
+          print("PASS: full-history interval diff contains only the two approved IR/XEC boundary corrections")
+          print(f"INFO: {len(new)} rebuilt intervals; {members.ticker.nunique()} distinct membership labels")
+          PY
+
+      - name: Save isolated build outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: spy-full-build-validation
+          path: |
+            data/universe/members.parquet
+            data/universe/membership_intervals.parquet
+            data/universe/current_constituents.csv
+            data/universe/current_constituents.meta.json
+            data/universe/renames.csv
+            data/universe/wiki_changes.csv
+            data/universe/tickers.txt
+          if-no-files-found: error
+          retention-days: 30
