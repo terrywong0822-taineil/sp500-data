@@ -106,6 +106,17 @@ jobs:
           print(f"INFO: {len(new)} rebuilt intervals; {members.ticker.nunique()} distinct membership labels")
           PY
 
+      - name: Download pinned price and no-trade inputs for the frozen width regression
+        run: |
+          mkdir -p data/validation
+          curl -fSsL --retry 3 -o data/validation/prices.parquet \
+            https://github.com/Johnbrick123/sp500-data/releases/download/data/prices.parquet
+          curl -fSsL --retry 3 -o data/validation/no_trade_days.csv \
+            https://github.com/Johnbrick123/sp500-data/releases/download/data/no_trade_days.csv
+
+      - name: Rebuild and compare the frozen 408-week SPY breadth series
+        run: python tools/validate_spy_breadth.py
+
       - name: Save isolated build outputs
         uses: actions/upload-artifact@v4
         with:
@@ -118,5 +129,6 @@ jobs:
             data/universe/renames.csv
             data/universe/wiki_changes.csv
             data/universe/tickers.txt
+            data/validation/spy-breadth-rebuilt.csv
           if-no-files-found: error
           retention-days: 30
