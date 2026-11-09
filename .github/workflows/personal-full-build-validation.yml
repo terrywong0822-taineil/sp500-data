@@ -117,7 +117,12 @@ jobs:
       - name: Rebuild and compare the frozen 408-week SPY breadth series
         run: python tools/validate_spy_breadth.py
 
+      - name: Diagnose denominator differences at member level
+        if: always()
+        run: python tools/diagnose_spy_breadth.py
+
       - name: Save isolated build outputs
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: spy-full-build-validation
@@ -130,5 +135,5 @@ jobs:
             data/universe/wiki_changes.csv
             data/universe/tickers.txt
             data/validation/spy-breadth-rebuilt.csv
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30
