@@ -96,6 +96,30 @@ def main() -> None:
     key = ["week_label", "spy_source_date"]
     merged = expected.merge(rebuilt, on=key, suffixes=("_old", "_new"), validate="one_to_one")
     assert len(merged) == 408
+    # Emit exact mismatching weeks and denominator diagnostics before asserting.
+    for col in ("index_members", "eligible_members", "above_200d_members", "below_50pct"):
+        diff = merged[f"{col}_old"].astype(int) - merged[f"{col}_new"].astype(int)
+        if (diff != 0).any():
+            cols = key + [f"{col}_old", f"{col}_new"]
+            print(f"DIFF {col}: {merged.loc[diff != 0, cols].to_dict('records')}")
+    if (merged["eligible_members_old"].astype(int) != merged["eligible_members_new"].astype(int)).any():
+        for row in merged.loc[
+            merged["eligible_members_old"].astype(int) != merged["eligible_members_new"].astype(int)
+        ].itertuples(index=False):
+            dt = pd.Timestamp(row.spy_source_date).normalize()
+            active = intervals[
+                (intervals["start"] <= dt) & (intervals["end"].isna() | (intervals["end"] > dt))
+            ]["ticker"].astype(str)
+            day = prices[prices["date"].dt.normalize() == dt]
+            day_tickers = set(day["ticker"].astype(str))
+            no_trade_today = {t for t, d0 in no_trade_pairs if d0 == dt}
+            print(
+                f"DENOM {dt.date()}: baseline={row.eligible_members_old}, rebuilt={row.eligible_members_new}, "
+                f"active={len(active)}, price_rows={len(day_tickers)}, "
+                f"missing_price={len(set(active)-day_tickers)}, no_trade={len(no_trade_today)}, "
+                f"no_trade_active={len(set(active)&no_trade_today)}, "
+                f"no_ma={int(day['ma200'].isna().sum()) if 'ma200' in day else 'n/a'}"
+            )
     for col in ("index_members", "eligible_members", "above_200d_members", "below_50pct"):
         diff = merged[f"{col}_old"].astype(int) - merged[f"{col}_new"].astype(int)
         assert (diff == 0).all(), f"{col} differs on {(diff != 0).sum()} weeks"
