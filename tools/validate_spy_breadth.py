@@ -11,7 +11,7 @@ FIXTURE = ROOT / "tests/fixtures/spy-breadth-weekly-2018-12-21_to_2026-10-09.csv
 PRICES = Path("data/validation/prices.parquet")
 NO_TRADE = Path("data/validation/no_trade_days.csv")
 
-EXPECTED_PRICES_SHA256 = "c398ee0aaf67e8a3280e21dcf99378bed42d05be62d63db8d6681ef6d0133209"
+EXPECTED_PRICES_SHA256 = "a601a1d91adc287eb8d0237bc6f121a9ea470dcb9ae50bce4cb769322bc582e9"
 EXPECTED_NO_TRADE_SHA256 = "e6ce9efaeea91b3e3e8198a6a3b20bf56d217e82fe83c83b133fab27492de2f1"
 # The frozen CSV was originally produced with this price artifact; exact fixture assertions are valid only with this input.
 FIXTURE_PRICES_SHA256 = "974f5745443a01f8bc965cc6213edf3b1f5c41fd08e02c77b6e2339ecae3531a"
