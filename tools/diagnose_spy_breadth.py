@@ -213,6 +213,23 @@ def main() -> None:
                 f"old_membership={int(row.eligible_members_old_membership)}"
             )
             print(f"ACTIVE_WITHOUT_MA {dt} {active_without_ma}")
+            for ticker in active_without_ma:
+                history = prices.loc[prices.ticker == ticker].sort_values("date")
+                valid = history.loc[history.adj_close.notna()]
+                ma_valid = history.loc[history.ma200.notna()]
+                through_date = valid.loc[valid.date <= dt_ts]
+                first_adj = (
+                    valid.date.min().date().isoformat() if len(valid) else "NONE"
+                )
+                first_ma = (
+                    ma_valid.date.min().date().isoformat() if len(ma_valid) else "NONE"
+                )
+                print(
+                    f"TICKER_HISTORY {dt} {ticker} "
+                    f"first_adj_close={first_adj} "
+                    f"valid_adj_close_rows_through_date={len(through_date)} "
+                    f"first_ma200={first_ma}"
+                )
 
     print("PASS: paired counterfactual completed with identical prices/no-trade/MA200 inputs")
     print("INFO: original-membership arm uses the pinned 2026-11-05 membership SHA")
