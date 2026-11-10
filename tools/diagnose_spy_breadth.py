@@ -195,12 +195,24 @@ def main() -> None:
         cols = ["week_label", "eligible_members_frozen", "eligible_members_old_membership"]
         print(f"FROZEN_DENOMINATOR_DIFF {frozen_diff[cols].to_dict('records')}")
         for row in frozen_diff.itertuples(index=False):
-            dt = pd.Timestamp(row.spy_source_date).date().isoformat()
+            dt_ts = pd.Timestamp(row.spy_source_date).normalize()
+            dt = dt_ts.date().isoformat()
+            active = set(old_intervals.loc[
+                (old_intervals.start <= dt_ts)
+                & (old_intervals.end.isna() | (old_intervals.end > dt_ts)),
+                "ticker",
+            ].astype(str))
+            day = prices.loc[prices.date.dt.normalize() == dt_ts]
+            available_ma = set(day.loc[
+                day.adj_close.notna() & day.ma200.notna(), "ticker"
+            ].astype(str))
+            active_without_ma = sorted(active - available_ma)
             print(
                 f"FROZEN_MEMBER_DIFF {dt} "
                 f"frozen={int(row.eligible_members_frozen)} "
                 f"old_membership={int(row.eligible_members_old_membership)}"
             )
+            print(f"ACTIVE_WITHOUT_MA {dt} {active_without_ma}")
 
     print("PASS: paired counterfactual completed with identical prices/no-trade/MA200 inputs")
     print("INFO: original-membership arm uses the pinned 2026-11-05 membership SHA")
